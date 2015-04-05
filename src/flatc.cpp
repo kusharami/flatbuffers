@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <limits>
+
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/idl.h"
 #include "flatbuffers/util.h"
@@ -160,7 +162,7 @@ int main(int argc, const char *argv[]) {
 
   // Now process the files:
   flatbuffers::Parser parser(opts.strict_json, proto_mode);
-  for (auto file_it = filenames.begin();
+  for (AUTO_VAR(file_it, filenames.begin());
             file_it != filenames.end();
           ++file_it) {
       std::string contents;
@@ -175,7 +177,7 @@ int main(int argc, const char *argv[]) {
           reinterpret_cast<const uint8_t *>(contents.c_str()),
           contents.length());
       } else {
-        auto local_include_directory = flatbuffers::StripFileName(*file_it);
+        std::string local_include_directory = flatbuffers::StripFileName(*file_it);
         include_directories.push_back(local_include_directory.c_str());
         include_directories.push_back(nullptr);
         if (!parser.Parse(contents.c_str(), &include_directories[0],

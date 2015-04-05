@@ -54,7 +54,7 @@ template<typename T> void Print(T val, Type type, int /*indent*/,
                                 std::string *_text) {
   std::string &text = *_text;
   if (type.enum_def && opts.output_enum_identifiers) {
-    auto enum_val = type.enum_def->ReverseLookup(static_cast<int>(val));
+    AUTO_VAR(enum_val, type.enum_def->ReverseLookup(static_cast<int>(val)));
     if (enum_val) {
       OutputIdentifier(enum_val->name, opts, _text);
       return;
@@ -161,8 +161,8 @@ template<> void Print<const void *>(const void *val,
       switch (type.base_type) {
         #define FLATBUFFERS_TD(ENUM, IDLTYPE, CTYPE, JTYPE, GTYPE, NTYPE) \
           case BASE_TYPE_ ## ENUM: \
-            PrintVector<CTYPE>( \
-              *reinterpret_cast<const Vector<CTYPE> *>(val), \
+            PrintVector<CTYPE >( \
+              *reinterpret_cast<const Vector<CTYPE > *>(val), \
               type, indent, opts, _text); break;
           FLATBUFFERS_GEN_TYPES(FLATBUFFERS_TD)
         #undef FLATBUFFERS_TD
@@ -211,7 +211,7 @@ static void GenStruct(const StructDef &struct_def, const Table *table,
   text += "{";
   int fieldout = 0;
   StructDef *union_sd = nullptr;
-  for (auto it = struct_def.fields.vec.begin();
+  for (AUTO_VAR(it, struct_def.fields.vec.begin());
        it != struct_def.fields.vec.end();
        ++it) {
     FieldDef &fd = **it;
@@ -242,8 +242,8 @@ static void GenStruct(const StructDef &struct_def, const Table *table,
             break;
       }
       if (fd.value.type.base_type == BASE_TYPE_UTYPE) {
-        auto enum_val = fd.value.type.enum_def->ReverseLookup(
-                                 table->GetField<uint8_t>(fd.value.offset, 0));
+        AUTO_VAR(enum_val, fd.value.type.enum_def->ReverseLookup(
+                          table->GetField<uint8_t>(fd.value.offset, 0)));
         assert(enum_val);
         union_sd = enum_val->struct_def;
       }
@@ -294,9 +294,9 @@ std::string TextMakeRule(const Parser &parser,
   std::string filebase = flatbuffers::StripPath(
       flatbuffers::StripExtension(file_name));
   std::string make_rule = TextFileName(path, filebase) + ": " + file_name;
-  auto included_files = parser.GetIncludedFilesRecursive(
-      parser.root_struct_def->file);
-  for (auto it = included_files.begin();
+  AUTO_VAR(included_files,
+    parser.GetIncludedFilesRecursive(parser.root_struct_def->file));
+  for (AUTO_VAR(it, included_files.begin());
        it != included_files.end(); ++it) {
     make_rule += " " + *it;
   }

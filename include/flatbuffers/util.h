@@ -121,6 +121,24 @@ inline bool SaveFile(const char *name, const std::string &buf, bool binary) {
 
 // Functionality for minimalistic portable path handling:
 
+#ifdef __BCPLUSPLUS__
+
+#define kPosixPathSeparator '/'
+
+  #ifdef _Windows
+
+  #define kPathSeparator '\\'
+  #define PathSeparatorSet "\\/"
+
+  #else
+
+  #define kPathSeparator kPosixPathSeparator
+  #define PathSeparatorSet "/"
+
+  #endif
+
+#else
+
 static const char kPosixPathSeparator = '/';
 #ifdef _WIN32
 static const char kPathSeparator = '\\';
@@ -129,6 +147,8 @@ static const char *PathSeparatorSet = "\\/";  // Intentionally no ':'
 static const char kPathSeparator = kPosixPathSeparator;
 static const char *PathSeparatorSet = "/";
 #endif // _WIN32
+
+#endif
 
 // Returns the path with the extension, if any, removed.
 inline std::string StripExtension(const std::string &filepath) {
@@ -145,7 +165,7 @@ inline std::string StripPath(const std::string &filepath) {
 // Strip the last component of the path + separator.
 inline std::string StripFileName(const std::string &filepath) {
   size_t i = filepath.find_last_of(PathSeparatorSet);
-  return i != std::string::npos ? filepath.substr(0, i) : "";
+  return i != std::string::npos ? filepath.substr(0, i) : std::string();
 }
 
 // Concatenates a path with a filename, regardless of wether the path
@@ -153,9 +173,13 @@ inline std::string StripFileName(const std::string &filepath) {
 inline std::string ConCatPathFileName(const std::string &path,
                                       const std::string &filename) {
   std::string filepath = path;
-  if (path.length() && path.back() != kPathSeparator &&
-                       path.back() != kPosixPathSeparator)
-    filepath += kPathSeparator;
+  if (path.length()) {
+    char last = path[path.length() - 1];
+
+    if (last != kPathSeparator && last != kPosixPathSeparator)
+      filepath += kPathSeparator;
+  }
+
   filepath += filename;
   return filepath;
 }
@@ -163,7 +187,7 @@ inline std::string ConCatPathFileName(const std::string &path,
 // This function ensure a directory exists, by recursively
 // creating dirs for any parts of the path that don't exist yet.
 inline void EnsureDirExists(const std::string &filepath) {
-  auto parent = StripFileName(filepath);
+  std::string parent = StripFileName(filepath);
   if (parent.length()) EnsureDirExists(parent);
   #ifdef _WIN32
     _mkdir(filepath.c_str());
@@ -182,7 +206,7 @@ inline std::string AbsolutePath(const std::string &filepath) {
     char abs_path[PATH_MAX];
     return realpath(filepath.c_str(), abs_path)
   #endif
-    ? abs_path
+    ? std::string(abs_path)
     : filepath;
 }
 

@@ -36,8 +36,8 @@ struct FnvTraits<uint32_t> {
 
 template <>
 struct FnvTraits<uint64_t> {
-  static const uint64_t kFnvPrime = 0x00000100000001b3;
-  static const uint64_t kOffsetBasis = 0xcbf29ce484222645;
+  static const uint64_t kFnvPrime = 0x00000100000001b3ull;
+  static const uint64_t kOffsetBasis = 0xcbf29ce484222645ull;
 };
 
 template <typename T>

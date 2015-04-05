@@ -17,6 +17,15 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+
+#include "flatbuffers/flatbuffers.h"
+
+#ifdef __BCPLUSPLUS__
+
+#pragma hdrstop
+
+#endif
+
 #include "flatbuffers/hash.h"
 
 enum OutputFormat {
