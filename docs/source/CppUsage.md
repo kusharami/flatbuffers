@@ -112,6 +112,12 @@ be compressed, or whatever you'd like to do with it. You can access the
 start of the buffer with `fbb.GetBufferPointer()`, and it's size from
 `fbb.GetSize()`.
 
+Calling code may take ownership of the buffer with `fbb.ReleaseBufferPointer()`.
+Should you do it, the `FlatBufferBuilder` will be in an invalid state,
+and *must* be cleared before it can be used again.
+However, it also means you are able to destroy the builder while keeping
+the buffer in your application.
+
 `samples/sample_binary.cpp` is a complete code sample similar to
 the code above, that also includes the reading code below.
 
@@ -245,7 +251,9 @@ reading, the actual overhead may be even lower than expected.
 In specialized cases where a denial of service attack is possible,
 the verifier has two additional constructor arguments that allow
 you to limit the nesting depth and total amount of tables the
-verifier may encounter before declaring the buffer malformed.
+verifier may encounter before declaring the buffer malformed. The default is
+`Verifier(buf, len, 64 /* max depth */, 1000000, /* max tables */)` which
+should be sufficient for most uses.
 
 ## Text & schema parsing
 

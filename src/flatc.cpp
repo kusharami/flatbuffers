@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+#include <limits>
+
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/idl.h"
 #include "flatbuffers/util.h"
@@ -112,18 +114,18 @@ int main(int argc, const char *argv[]) {
   std::vector<std::string> filenames;
   std::vector<const char *> include_directories;
   size_t binary_files_from = std::numeric_limits<size_t>::max();
-  for (int i = 1; i < argc; i++) {
-    const char *arg = argv[i];
+  for (int argi = 1; argi < argc; argi++) {
+    const char *arg = argv[argi];
     if (arg[0] == '-') {
       if (filenames.size() && arg[1] != '-')
         Error("invalid option location", arg, true);
       std::string opt = arg;
       if (opt == "-o") {
-        if (++i >= argc) Error("missing path following", arg, true);
-        output_path = flatbuffers::ConCatPathFileName(argv[i], "");
+        if (++argi >= argc) Error("missing path following", arg, true);
+        output_path = flatbuffers::ConCatPathFileName(argv[argi], "");
       } else if(opt == "-I") {
-        if (++i >= argc) Error("missing path following", arg, true);
-        include_directories.push_back(argv[i]);
+        if (++argi >= argc) Error("missing path following", arg, true);
+        include_directories.push_back(argv[argi]);
       } else if(opt == "--strict-json") {
         opts.strict_json = true;
       } else if(opt == "--no-prefix") {
@@ -149,7 +151,7 @@ int main(int argc, const char *argv[]) {
         found:;
       }
     } else {
-      filenames.push_back(argv[i]);
+      filenames.push_back(argv[argi]);
     }
   }
 
@@ -160,7 +162,7 @@ int main(int argc, const char *argv[]) {
 
   // Now process the files:
   flatbuffers::Parser parser(opts.strict_json, proto_mode);
-  for (auto file_it = filenames.begin();
+  for (AUTO_VAR(file_it, filenames.begin());
             file_it != filenames.end();
           ++file_it) {
       std::string contents;
@@ -175,7 +177,7 @@ int main(int argc, const char *argv[]) {
           reinterpret_cast<const uint8_t *>(contents.c_str()),
           contents.length());
       } else {
-        auto local_include_directory = flatbuffers::StripFileName(*file_it);
+        std::string local_include_directory = flatbuffers::StripFileName(*file_it);
         include_directories.push_back(local_include_directory.c_str());
         include_directories.push_back(nullptr);
         if (!parser.Parse(contents.c_str(), &include_directories[0],

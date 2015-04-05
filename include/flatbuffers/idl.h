@@ -145,21 +145,21 @@ struct Value {
 template<typename T> class SymbolTable {
  public:
   ~SymbolTable() {
-    for (auto it = vec.begin(); it != vec.end(); ++it) {
+    for (AUTO_VAR(it, vec.begin()); it != vec.end(); ++it) {
       delete *it;
     }
   }
 
   bool Add(const std::string &name, T *e) {
-    vec.emplace_back(e);
-    auto it = dict.find(name);
+    vec.push_back(e);
+    AUTO_VAR(it, dict.find(name));
     if (it != dict.end()) return true;
     dict[name] = e;
     return false;
   }
 
   T *Lookup(const std::string &name) const {
-    auto it = dict.find(name);
+    AUTO_VAR(it, dict.find(name));
     return it == dict.end() ? nullptr : it->second;
   }
 
@@ -211,7 +211,7 @@ struct StructDef : public Definition {
     {}
 
   void PadLastField(size_t minalign) {
-    auto padding = PaddingBytes(bytesize, minalign);
+    AUTO_VAR(padding, PaddingBytes(bytesize, minalign));
     bytesize += padding;
     if (fields.vec.size()) fields.vec.back()->padding = padding;
   }
@@ -251,7 +251,7 @@ struct EnumDef : public Definition {
   EnumDef() : is_union(false) {}
 
   EnumVal *ReverseLookup(int enum_idx, bool skip_union_default = true) {
-    for (auto it = vals.vec.begin() + static_cast<int>(is_union &&
+    for (AUTO_VAR(it, vals.vec.begin()) + static_cast<int>(is_union &&
                                                        skip_union_default);
              it != vals.vec.end(); ++it) {
       if ((*it)->value == enum_idx) {
@@ -280,6 +280,7 @@ class Parser {
     known_attributes_.insert("deprecated");
     known_attributes_.insert("required");
     known_attributes_.insert("key");
+    known_attributes_.insert("hash");
     known_attributes_.insert("id");
     known_attributes_.insert("force_align");
     known_attributes_.insert("bit_flags");
@@ -288,7 +289,7 @@ class Parser {
   }
 
   ~Parser() {
-    for (auto it = namespaces_.begin(); it != namespaces_.end(); ++it) {
+    for (AUTO_VAR(it, namespaces_.begin()); it != namespaces_.end(); ++it) {
       delete *it;
     }
   }
@@ -334,6 +335,7 @@ class Parser {
   uoffset_t ParseVector(const Type &type);
   void ParseMetaData(Definition &def);
   bool TryTypedValue(int dtoken, bool check, Value &e, BaseType req);
+  void ParseHash(Value &e, FieldDef* field);
   void ParseSingleValue(Value &e);
   int64_t ParseIntegerFromString(Type &type);
   StructDef *LookupCreateStruct(const std::string &name);
@@ -356,7 +358,7 @@ class Parser {
   std::string file_extension_;
 
   std::map<std::string, bool> included_files_;
-  std::map<std::string, std::set<std::string>> files_included_per_file_;
+	std::map<std::string, std::set<std::string> > files_included_per_file_;
 
  private:
   const char *source_, *cursor_;
@@ -368,7 +370,7 @@ class Parser {
   std::string attribute_;
   std::vector<std::string> doc_comment_;
 
-  std::vector<std::pair<Value, FieldDef *>> field_stack_;
+  std::vector<std::pair<Value, FieldDef *> > field_stack_;
   std::vector<uint8_t> struct_stack_;
 
   std::set<std::string> known_attributes_;
@@ -379,7 +381,7 @@ class Parser {
 extern std::string MakeCamel(const std::string &in, bool first = true);
 extern void GenComment(const std::vector<std::string> &dc,
                        std::string *code_ptr,
-                       const char *prefix = "");
+                       const char *prefix = nullptr);
 
 // Container of options that may apply to any of the source/text generators.
 struct GeneratorOptions {
