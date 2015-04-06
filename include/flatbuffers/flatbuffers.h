@@ -70,7 +70,7 @@
 #define TOKEN_CONCAT(x,y) PRE_TOKEN_CONCAT(x,y)
 
 #if defined(__BCPLUSPLUS__)
-  #if defined(__WIN32__)
+  #if !defined(__clang__)
     #include <boost/function.hpp>
     #include <boost/bind.hpp>
 
@@ -79,7 +79,8 @@
       struct __##NAME##_class { \
         static bool Compare(ELEMENT_A, ELEMENT_B)
 
-    #define SORT_COMPARATOR_END(NAME) }; \
+    #define SORT_COMPARATOR_END(NAME) \
+      }; \
       NAME = &__##NAME##_class::Compare
 
     #define FLATBUFFERS_FINAL_CLASS
@@ -96,7 +97,9 @@
 
     #define OVERRIDE
 
-    #define __BCC32__
+    #define NO_UNIQUE_PTR
+
+    #define USE_BOOST
   #else
     #define FLATBUFFERS_FINAL_CLASS final
   #endif
@@ -107,7 +110,7 @@
   #define FLATBUFFERS_FINAL_CLASS
 #endif
 
-#ifndef __BCC32__
+#ifndef USE_BOOST
   #define SORT_COMPARATOR_BEGIN(NAME, ELEMENT_A, ELEMENT_B) \
     auto NAME = [](ELEMENT_A, ELEMENT_B)->bool
 
@@ -120,7 +123,7 @@
 
   #define UNIQUE_TOKEN(name) TOKEN_CONCAT(name,__COUNTER__)
 
-#define OVERRIDE override
+  #define OVERRIDE override
 #endif
 
 namespace flatbuffers {
@@ -139,7 +142,7 @@ typedef uint16_t voffset_t;
 
 typedef uintmax_t largest_scalar_t;
 
-#if !defined(__BCC32__)
+#if !defined(NO_UNIQUE_PTR)
 // Pointer to relinquished memory.
 typedef std::unique_ptr<uint8_t, std::function<void(uint8_t * /* unused */)> >
           unique_ptr_t;
@@ -431,7 +434,7 @@ class vector_downward {
     cur_ = buf_ + reserved_;
   }
 
-#if !defined(__BCC32__)
+#if !defined(NO_UNIQUE_PTR)
   // Relinquish the pointer to the caller.
   unique_ptr_t release() {
     // Actually deallocate from the start of the allocated memory.
@@ -555,7 +558,7 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
   // Get the serialized buffer (after you call Finish()).
   uint8_t *GetBufferPointer() const { return buf_.data(); }
 
-#if !defined(__BCC32__)
+#if !defined(NO_UNIQUE_PTR)
   // Get the released pointer to the serialized buffer.
   // Don't attempt to use this FlatBufferBuilder afterwards!
   unique_ptr_t ReleaseBufferPointer() { return buf_.release(); }
@@ -1140,7 +1143,7 @@ inline int LookupEnum(const char **names, const char *name) {
   #define STRUCT_END(name, size) \
     _Pragma("pack()") \
     static_assert(sizeof(name) == size, "compiler breaks packing rules")
-#elif defined(__BCPLUSPLUS__) && defined(__WIN32__)
+#elif defined(__BCPLUSPLUS__)
   #define MANUALLY_ALIGNED_STRUCT(alignment) \
     struct
   #define STRUCT_END(name, size) \
@@ -1159,7 +1162,7 @@ inline int LookupEnum(const char **names, const char *name) {
 // appreciate if you left it in.
 
 // Weak linkage is culled by VS & doesn't work on cygwin.
-#if !defined(_WIN32) && !defined(__CYGWIN__)
+#if !defined(__BCPLUSPLUS__) && !defined(_WIN32) && !defined(__CYGWIN__)
 
 extern volatile __attribute__((weak)) const char *flatbuffer_version_string;
 volatile __attribute__((weak)) const char *flatbuffer_version_string =
