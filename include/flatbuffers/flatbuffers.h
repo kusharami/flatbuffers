@@ -804,7 +804,7 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
  public:
   template<typename T> Offset<Vector<Offset<T> > > CreateVectorOfSortedTables(
                                                      Offset<T> *v, size_t len) {
-    std::sort(v, v + len, std_or_boost::bind(&FlatBufferBuider::TableKeysCompare,
+    std::sort(v, v + len, std_or_boost::bind(&FlatBufferBuilder::TableKeysCompare<T>,
       this, BIND_PLACEHOLDER(2), BIND_PLACEHOLDER(3)));
     return CreateVector(v, len);
   }
