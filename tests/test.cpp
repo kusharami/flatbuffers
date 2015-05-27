@@ -28,6 +28,7 @@ using namespace MyGame::Example;
   #include <android/log.h>
   #define TEST_OUTPUT_LINE(...) \
     __android_log_print(ANDROID_LOG_INFO, "FlatBuffers", __VA_ARGS__)
+  #define FLATBUFFERS_NO_FILE_TESTS
 #else
   #define TEST_OUTPUT_LINE(...) \
     { printf(__VA_ARGS__); printf("\n"); }
@@ -37,7 +38,7 @@ int testing_fails = 0;
 
 template<typename T, typename U>
 void TestEq(T expval, U val, const char *exp, const char *file, int line) {
-  if (expval != val) {
+  if (U(expval) != val) {
     auto expval_str = flatbuffers::NumToString(expval);
     auto val_str = flatbuffers::NumToString(val);
     TEST_OUTPUT_LINE("TEST FAILED: %s:%d, %s (%s) != %s", file, line,
@@ -127,7 +128,7 @@ flatbuffers::unique_ptr_t CreateFlatBufferTest(std::string &buffer) {
 }
 
 //  example of accessing a buffer loaded in memory:
-void AccessFlatBufferTest(const uint8_t *flatbuf, const std::size_t length) {
+void AccessFlatBufferTest(const uint8_t *flatbuf, size_t length) {
 
   // First, verify the buffers integrity (optional)
   flatbuffers::Verifier verifier(flatbuf, length);
@@ -135,6 +136,7 @@ void AccessFlatBufferTest(const uint8_t *flatbuf, const std::size_t length) {
 
   TEST_EQ(strcmp(MonsterIdentifier(), "MONS"), 0);
   TEST_EQ(MonsterBufferHasIdentifier(flatbuf), true);
+  TEST_EQ(strcmp(MonsterExtension(), "mon"), 0);
 
   // Access the buffer from the root.
   auto monster = GetMonster(flatbuf);
@@ -158,6 +160,8 @@ void AccessFlatBufferTest(const uint8_t *flatbuf, const std::size_t length) {
   unsigned char inv_data[] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
   for (auto it = inventory->begin(); it != inventory->end(); ++it)
     TEST_EQ(*it, inv_data[it - inventory->begin()]);
+
+  TEST_EQ(monster->color(), Color_Blue);
 
   // Example of accessing a union:
   TEST_EQ(monster->test_type(), Any_Monster);  // First make sure which it is.
@@ -200,6 +204,54 @@ void AccessFlatBufferTest(const uint8_t *flatbuf, const std::size_t length) {
   for (auto it = tests->begin(); it != tests->end(); ++it) {
     TEST_EQ(it->a() == 10 || it->a() == 30, true);  // Just testing iterators.
   }
+}
+
+// Change a FlatBuffer in-place, after it has been constructed.
+void MutateFlatBuffersTest(uint8_t *flatbuf, std::size_t length) {
+  // Get non-const pointer to root.
+  auto monster = GetMutableMonster(flatbuf);
+
+  // Each of these tests mutates, then tests, then set back to the original,
+  // so we can test that the buffer in the end still passes our original test.
+  auto hp_ok = monster->mutate_hp(10);
+  TEST_EQ(hp_ok, true);  // Field was present.
+  TEST_EQ(monster->hp(), 10);
+  monster->mutate_hp(80);
+
+  auto mana_ok = monster->mutate_mana(10);
+  TEST_EQ(mana_ok, false);  // Field was NOT present, because default value.
+
+  // Mutate structs.
+  auto pos = monster->mutable_pos();
+  auto test3 = pos->mutable_test3();  // Struct inside a struct.
+  test3.mutate_a(50);                 // Struct fields never fail.
+  TEST_EQ(test3.a(), 50);
+  test3.mutate_a(10);
+
+  // Mutate vectors.
+  auto inventory = monster->mutable_inventory();
+  inventory->Mutate(9, 100);
+  TEST_EQ(inventory->Get(9), 100);
+  inventory->Mutate(9, 9);
+
+  // Run the verifier and the regular test to make sure we didn't trample on
+  // anything.
+  AccessFlatBufferTest(flatbuf, length);
+}
+
+void ReflectionTest(uint8_t *flatbuf, std::size_t length) {
+  // Dynamically iterate through a buffer, and read/modify fields
+
+  // We'll need the schema for this.
+  std::string schemafile;
+  TEST_EQ(flatbuffers::LoadFile(
+    "tests/monster_test.fbs", false, &schemafile), true);
+  flatbuffers::Parser parser;
+  const char *include_directories[] = { "tests", nullptr };
+  TEST_EQ(parser.Parse(schemafile.c_str(), include_directories), true);
+
+  auto root = flatbuffers::GetRoot<flatbuffers::Table>(flatbuf);
+  auto hp_field = parser.root_struct_def->fields.Lookup("hp");
 
 }
 
@@ -626,7 +678,9 @@ int main(int /*argc*/, const char * /*argv*/[]) {
                        rawbuf.length());
   AccessFlatBufferTest(flatbuf.get(), rawbuf.length());
 
-  #ifndef __ANDROID__  // requires file access
+  MutateFlatBuffersTest(flatbuf.get(), rawbuf.length());
+
+  #ifndef FLATBUFFERS_NO_FILE_TESTS
   ParseAndGenerateTextTest();
   ParseProtoTest();
   #endif

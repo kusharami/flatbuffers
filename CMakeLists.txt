@@ -24,6 +24,7 @@ set(FlatBuffers_Compiler_SRCS
   src/idl_gen_cpp.cpp
   src/idl_gen_general.cpp
   src/idl_gen_go.cpp
+  src/idl_gen_python.cpp
   src/idl_gen_text.cpp
   src/idl_gen_fbs.cpp
   src/flatc.cpp
@@ -40,6 +41,7 @@ set(FlatBuffers_Tests_SRCS
   include/flatbuffers/idl.h
   include/flatbuffers/util.h
   src/idl_parser.cpp
+  src/idl_gen_general.cpp
   src/idl_gen_text.cpp
   src/idl_gen_fbs.cpp
   tests/test.cpp
@@ -84,10 +86,9 @@ if(FLATBUFFERS_CODE_COVERAGE)
 endif()
 
 if(BIICODE)
-  # Execute biicode building
-  include(CMake/biicode.cmake)
+  include(biicode/cmake/biicode.cmake)
   return()
-endif(BIICODE)
+endif()
 
 include_directories(include)
 
@@ -95,7 +96,7 @@ if(FLATBUFFERS_BUILD_FLATC)
   add_executable(flatc ${FlatBuffers_Compiler_SRCS})
 endif()
 
-if(FLATBUFFERS_BUILD_FLATC)
+if(FLATBUFFERS_BUILD_FLATHASH)
   add_executable(flathash ${FlatHash_SRCS})
 endif()
 
@@ -104,7 +105,7 @@ function(compile_flatbuffers_schema_to_cpp SRC_FBS)
   string(REGEX REPLACE "\\.fbs$" "_generated.h" GEN_HEADER ${SRC_FBS})
   add_custom_command(
     OUTPUT ${GEN_HEADER}
-    COMMAND flatc -c -o "${SRC_FBS_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FBS}"
+    COMMAND flatc -c --gen-mutable -o "${SRC_FBS_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/${SRC_FBS}"
     DEPENDS flatc)
 endfunction()
 

@@ -21,6 +21,7 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
 #include <type_traits>
 #include <string>
@@ -344,37 +345,35 @@ public:
   iterator begin() { return iterator(Data(), 0); }
   const_iterator begin() const { return const_iterator(Data(), 0); }
 
-  iterator end() { return iterator(Data(), length_); }
-  const_iterator end() const { return const_iterator(Data(), length_); }
+  iterator end() { return iterator(Data(), size()); }
+  const_iterator end() const { return const_iterator(Data(), size()); }
+
+  // Change elements if you have a non-const pointer to this object.
+  void Mutate(uoffset_t i, T val) {
+    assert(i < size());
+    WriteScalar(Data() + i * sizeof(T), val);
+  }
 
   // The raw data in little endian format. Use with care.
   const uint8_t *Data() const {
     return reinterpret_cast<const uint8_t *>(&length_ + 1);
   }
 
+  uint8_t *Data() {
+    return reinterpret_cast<uint8_t *>(&length_ + 1);
+  }
+
   template<typename K> return_type LookupByKey(K key) const {
-    AUTO_VAR(span, size());
-    uoffset_t start = 0;
-    // Perform binary search for key.
-    while (span) {
-      // Compare against middle element of current span.
-      AUTO_VAR(middle, span / 2);
-      AUTO_VAR(table, Get(start + middle));
-      AUTO_VAR(comp, table->KeyCompareWithValue(key));
-      if (comp > 0) {
-        // Greater than. Adjust span and try again.
-        span = middle;
-      } else if (comp < 0) {
-        // Less than. Adjust span and try again.
-        middle++;
-        start += middle;
-        span -= middle;
-      } else {
-        // Found element.
-        return table;
-      }
+    void *search_result = std::bsearch(&key, Data(), size(),
+        IndirectHelper<T>::element_stride, KeyCompare<K>);
+
+    if (!search_result) {
+      return nullptr;  // Key not found.
     }
-    return nullptr;  // Key not found.
+
+    const uint8_t *data = reinterpret_cast<const uint8_t *>(search_result);
+
+    return IndirectHelper<T>::Read(data, 0);
   }
 
 protected:
@@ -383,6 +382,17 @@ protected:
   Vector();
 
   uoffset_t length_;
+
+private:
+  template<typename K> static int KeyCompare(const void *ap, const void *bp) {
+    const K *key = reinterpret_cast<const K *>(ap);
+    const uint8_t *data = reinterpret_cast<const uint8_t *>(bp);
+    auto table = IndirectHelper<T>::Read(data, 0);
+
+    // std::bsearch compares with the operands transposed, so we negate the
+    // result here.
+    return -table->KeyCompareWithValue(*key);
+  }
 };
 
 // Convenient helper function to get the length of any vector, regardless
@@ -872,11 +882,15 @@ class FlatBufferBuilder FLATBUFFERS_FINAL_CLASS {
   bool force_defaults_;  // Serialize values equal to their defaults anyway.
 };
 
-// Helper to get a typed pointer to the root object contained in the buffer.
-template<typename T> const T *GetRoot(const void *buf) {
+// Helpers to get a typed pointer to the root object contained in the buffer.
+template<typename T> T *GetMutableRoot(void *buf) {
   EndianCheck();
-  return reinterpret_cast<const T *>(reinterpret_cast<const uint8_t *>(buf) +
-    EndianScalar(*reinterpret_cast<const uoffset_t *>(buf)));
+  return reinterpret_cast<T *>(reinterpret_cast<uint8_t *>(buf) +
+    EndianScalar(*reinterpret_cast<uoffset_t *>(buf)));
+}
+
+template<typename T> const T *GetRoot(const void *buf) {
+  return GetMutableRoot<T>(const_cast<void *>(buf));
 }
 
 // Helper to see if the identifier in a buffer has the expected value.
@@ -1044,7 +1058,7 @@ class Table {
     return field_offset ? ReadScalar<T>(data_ + field_offset) : defaultval;
   }
 
-  template<typename P> P GetPointer(voffset_t field) const {
+  template<typename P> P GetPointer(voffset_t field) {
     AUTO_VAR(field_offset, GetOptionalFieldOffset(field));
     AUTO_VAR(p, &data_[field_offset]);
     return field_offset
@@ -1052,18 +1066,21 @@ class Table {
       : nullptr;
   }
 
-  template<typename P> P GetStruct(voffset_t field) const {
-    AUTO_VAR(field_offset, GetOptionalFieldOffset(field));
-    return field_offset ? reinterpret_cast<P>(data_ + field_offset) : nullptr;
+  template<typename P> P GetPointer(voffset_t field) const {
+    return const_cast<Table *>(this)->GetPointer<P>(field);
   }
 
-  template<typename T> void SetField(voffset_t field, T val) {
+  template<typename P> P GetStruct(voffset_t field) const {
     AUTO_VAR(field_offset, GetOptionalFieldOffset(field));
-    // If this asserts, you're trying to set a field that's not there
-    // (or should we return a bool instead?).
-    // check if it exists first using CheckField()
-    assert(field_offset);
+	AUTO_VAR(p, const_cast<uint8_t *>(&data_[field_offset]);
+    return field_offset ? reinterpret_cast<P>(p) : nullptr;
+  }
+
+  template<typename T> bool SetField(voffset_t field, T val) {
+    AUTO_VAR(field_offset, GetOptionalFieldOffset(field));
+    if (!field_offset) return false;
     WriteScalar(data_ + field_offset, val);
+    return true;
   }
 
   bool CheckField(voffset_t field) const {
