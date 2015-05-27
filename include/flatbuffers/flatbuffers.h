@@ -1072,7 +1072,7 @@ class Table {
 
   template<typename P> P GetStruct(voffset_t field) const {
     AUTO_VAR(field_offset, GetOptionalFieldOffset(field));
-	AUTO_VAR(p, const_cast<uint8_t *>(&data_[field_offset]);
+	AUTO_VAR(p, const_cast<uint8_t *>(&data_[field_offset]));
     return field_offset ? reinterpret_cast<P>(p) : nullptr;
   }
 
