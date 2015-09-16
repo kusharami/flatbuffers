@@ -151,7 +151,7 @@ static void GetUByteSlice(const StructDef &struct_def,
   std::string &code = *code_ptr;
 
   GenReceiver(struct_def, code_ptr);
-  code += " " + MakeCamel(field.name) + "Bytes(";
+  code += " " + flatbuffers::MakeCamel(field.name) + "Bytes(";
   code += ") []byte " + OffsetPrefix(field);
   code += "\t\treturn rcv._tab.ByteVector(o + rcv._tab.Pos)\n\t}\n";
   code += "\treturn nil\n}\n\n";

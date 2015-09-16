@@ -555,13 +555,13 @@ static void GenStruct(const LanguageParameters &lang, const Parser &parser,
     GenComment(field.doc_comment, code_ptr, &lang.comment_config, "  ");
     std::string type_name = GenTypeGet(lang, field.value.type);
     std::string type_name_dest = GenTypeNameDest(lang, field.value.type);
-    std::string dest_mask = DestinationMask(lang, field.value.type, true);
+    std::string dest_mask = DestinationMask( lang, field.value.type, true);
     std::string dest_cast = DestinationCast(lang, field.value.type);
     std::string method_start = "  public " + type_name_dest + " " +
                                MakeCamel(field.name, lang.first_camel_upper);
     // Most field accessors need to retrieve and test the field offset first,
     // this is the prefix code for that:
-    auto offset_prefix = " { int o = __offset(" +
+    std::string offset_prefix = " { int o = __offset(" +
       NumToString(field.value.offset) +
       "); return o != 0 ? ";
     // Generate the accessors that don't do object reuse.
@@ -577,7 +577,7 @@ static void GenStruct(const LanguageParameters &lang, const Parser &parser,
       else {
         code += method_start + "() { return ";
         code += MakeCamel(field.name, lang.first_camel_upper);
-        code += "(new ";
+		code += "(new ";
         code += type_name + "()); }\n";
       }
     } else if (field.value.type.base_type == BASE_TYPE_VECTOR &&
@@ -601,7 +601,7 @@ static void GenStruct(const LanguageParameters &lang, const Parser &parser,
       if (lang.language == GeneratorOptions::kCSharp) {
         // union types in C# use generic Table-derived type for better type safety
         method_start = "  public " + type_name_dest + " Get" + MakeCamel(field.name, lang.first_camel_upper) + "<TTable>";
-        offset_prefix = " where TTable : Table" + offset_prefix;
+		offset_prefix = " where TTable : Table" + offset_prefix;
         type_name = type_name_dest;
       }
     }

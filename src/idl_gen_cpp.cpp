@@ -240,14 +240,13 @@ static void GenTable(const Parser &parser, StructDef &struct_def,
                                 true);
       code += field.name + "() const { return ";
       // Call a different accessor for pointers, that indirects.
-      AUTO_VAR(accessor, is_scalar)
+	  std::string accessor = is_scalar
         ? "GetField<"
         : (IsStruct(field.value.type) ? "GetStruct<" : "GetPointer<");
       AUTO_VAR(offsetstr, NumToString(field.value.offset));
-      AUTO_VAR(call,
-          accessor +
-          GenTypeGet(parser, field.value.type, "", "const ", " *", false) +
-          ">(" + offsetstr);
+	  std::string call = accessor +
+		  GenTypeGet(parser, field.value.type, "", "const ", " *", false);
+	  call += ">(" + offsetstr;
       // Default value as second arg for non-pointer types.
       if (IsScalar(field.value.type.base_type))
         call += ", " + field.value.constant;
@@ -262,7 +261,7 @@ static void GenTable(const Parser &parser, StructDef &struct_def,
           code += GenUnderlyingCast(parser, field, false, field.name);
           code += "); }\n";
         } else {
-          auto type = GenTypeGet(parser, field.value.type, " ", "", " *", true);
+          std::string type = GenTypeGet(parser, field.value.type, " ", "", " *", true);
           code += "  " + type + "mutable_" + field.name + "() { return ";
           code += GenUnderlyingCast(parser, field, true,
                                     accessor + type + ">(" + offsetstr + ")");

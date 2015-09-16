@@ -303,7 +303,7 @@ void Parser::ParseNamespacing(std::string *id, std::string *last) {
 }
 
 EnumDef *Parser::LookupEnum(const std::string &id) {
-  auto ed = enums_.Lookup(GetFullyQualifiedName(id));
+  EnumDef *ed = enums_.Lookup(GetFullyQualifiedName(id));
   // id may simply not have a namespace at all, so check that too.
   if (!ed) ed = enums_.Lookup(id);
   return ed;
@@ -853,8 +853,8 @@ void Parser::ParseEnum(bool is_union) {
   Expect('{');
   if (is_union) enum_def.vals.Add("NONE", new EnumVal("NONE", 0));
   do {
-    auto value_name = attribute_;
-    auto full_name = value_name;
+	std::string value_name = attribute_;
+    std::string full_name = value_name;
     std::vector<std::string> value_comment = doc_comment_;
     Expect(kTokenIdentifier);
     if (is_union) ParseNamespacing(&full_name, &value_name);
@@ -862,7 +862,7 @@ void Parser::ParseEnum(bool is_union) {
     auto value = enum_def.vals.vec.size()
       ? enum_def.vals.vec.back()->value + 1
       : 0;
-    auto &ev = *new EnumVal(value_name, value);
+    EnumVal &ev = *new EnumVal(value_name, value);
     if (enum_def.vals.Add(value_name, &ev))
       Error("enum value already exists: " + value_name);
     ev.doc_comment = value_comment;
