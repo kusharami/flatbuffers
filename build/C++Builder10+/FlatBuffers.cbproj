@@ -5,7 +5,7 @@
         <FrameworkType>None</FrameworkType>
         <Base>True</Base>
         <Config Condition="'$(Config)'==''">Debug</Config>
-        <Platform Condition="'$(Platform)'==''">Win64</Platform>
+        <Platform Condition="'$(Platform)'==''">Win32</Platform>
         <TargetedPlatforms>1107</TargetedPlatforms>
         <AppType>StaticLibrary</AppType>
         <Platform>Android</Platform>
@@ -131,7 +131,7 @@
         <BCC_ShortEnum>true</BCC_ShortEnum>
         <IncludePath>..\..\include\flatbuffers\;..\..\src\;..\..\include;$(IncludePath)</IncludePath>
         <BCC_InstructionSet>6</BCC_InstructionSet>
-        <TLIB_PageSize>128</TLIB_PageSize>
+        <TLIB_PageSize>256</TLIB_PageSize>
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
         <SanitizedProjectName>FlatBuffers</SanitizedProjectName>
         <_TCHARMapping>char</_TCHARMapping>
@@ -244,6 +244,7 @@
         <DCC_RemoteDebug>true</DCC_RemoteDebug>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
+        <TLIB_PageSize>256</TLIB_PageSize>
         <VerInfo_Locale>1049</VerInfo_Locale>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
