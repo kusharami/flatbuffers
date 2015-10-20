@@ -1,4 +1,4 @@
-﻿/*
+/*
  * Copyright 2014 Google Inc. All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,6 +49,17 @@ namespace FlatBuffers
             _bb = new ByteBuffer(new byte[initialSize]);
         }
 
+        public void Clear()
+        {
+            _space = _bb.Length;
+            _bb.Reset();
+            _minAlign = 1;
+            _vtable = null;
+            _objectStart = 0;
+            _vtables = new int[16];
+            _numVtables = 0;
+            _vectorNumElems = 0;
+        }
 
         public int Offset { get { return _bb.Length - _space; } }
 
@@ -75,8 +86,7 @@ namespace FlatBuffers
 
             Buffer.BlockCopy(oldBuf, 0, newBuf, newBufSize - oldBufSize,
                              oldBufSize);
-
-            _bb = new ByteBuffer(newBuf);
+            _bb = new ByteBuffer(newBuf, newBufSize);
         }
 
         // Prepare to write an element of `size` after `additional_bytes`
@@ -196,10 +206,10 @@ namespace FlatBuffers
             Prep(alignment, elemSize * count); // Just in case alignment > int.
         }
 
-        public int EndVector()
+        public VectorOffset EndVector()
         {
             PutInt(_vectorNumElems);
-            return Offset;
+            return new VectorOffset(Offset);
         }
 
         public void Nested(int obj)
@@ -250,7 +260,7 @@ namespace FlatBuffers
         public void AddDouble(int o, double x, double d) { if (x != d) { AddDouble(x); Slot(o); } }
         public void AddOffset(int o, int x, int d) { if (x != d) { AddOffset(x); Slot(o); } }
 
-        public int CreateString(string s)
+        public StringOffset CreateString(string s)
         {
             NotNested();
             byte[] utf8 = Encoding.UTF8.GetBytes(s);
@@ -258,7 +268,7 @@ namespace FlatBuffers
             StartVector(1, utf8.Length, 1);
             Buffer.BlockCopy(utf8, 0, _bb.Data, _space -= utf8.Length,
                              utf8.Length);
-            return EndVector();
+            return new StringOffset(EndVector().Value);
         }
 
         // Structs are stored inline, so nothing additional is being added.
@@ -359,6 +369,7 @@ namespace FlatBuffers
         {
             Prep(_minAlign, sizeof(int));
             AddOffset(rootTable);
+            _bb.Position = _space;
         }
 
         public ByteBuffer DataBuffer { get { return _bb; } }
@@ -387,7 +398,7 @@ namespace FlatBuffers
              {
                 AddByte((byte)fileIdentifier[i]);
              }
-             AddOffset(rootTable);
+             Finish(rootTable);
         }
 
 

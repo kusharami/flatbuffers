@@ -138,7 +138,7 @@ static void GetVectorLen(const StructDef &struct_def,
   std::string &code = *code_ptr;
 
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name) + "Length(";
+  code += " " + MakeCamel(field.name) + "Length(";
   code += ") int " + OffsetPrefix(field);
   code += "\t\treturn rcv._tab.VectorLen(o)\n\t}\n";
   code += "\treturn 0\n}\n\n";
@@ -151,7 +151,7 @@ static void GetUByteSlice(const StructDef &struct_def,
   std::string &code = *code_ptr;
 
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name) + "Bytes(";
+  code += " " + MakeCamel(field.name) + "Bytes(";
   code += ") []byte " + OffsetPrefix(field);
   code += "\t\treturn rcv._tab.ByteVector(o + rcv._tab.Pos)\n\t}\n";
   code += "\treturn nil\n}\n\n";
@@ -164,7 +164,7 @@ static void GetScalarFieldOfStruct(const StructDef &struct_def,
   std::string &code = *code_ptr;
   std::string getter = GenGetter(field.value.type);
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name);
+  code += " " + MakeCamel(field.name);
   code += "() " + TypeName(field) + " { return " + getter;
   code += "(rcv._tab.Pos + flatbuffers.UOffsetT(";
   code += NumToString(field.value.offset) + ")) }\n";
@@ -177,7 +177,7 @@ static void GetScalarFieldOfTable(const StructDef &struct_def,
   std::string &code = *code_ptr;
   std::string getter = GenGetter(field.value.type);
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name);
+  code += " " + MakeCamel(field.name);
   code += "() " + TypeName(field) + " ";
   code += OffsetPrefix(field) + "\t\treturn " + getter;
   code += "(o + rcv._tab.Pos)\n\t}\n";
@@ -192,7 +192,7 @@ static void GetStructFieldOfStruct(const StructDef &struct_def,
                                    std::string *code_ptr) {
   std::string &code = *code_ptr;
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name);
+  code += " " + MakeCamel(field.name);
   code += "(obj *" + TypeName(field);
   code += ") *" + TypeName(field);
   code += " {\n";
@@ -212,7 +212,7 @@ static void GetStructFieldOfTable(const StructDef &struct_def,
                                   std::string *code_ptr) {
   std::string &code = *code_ptr;
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name);
+  code += " " + MakeCamel(field.name);
   code += "(obj *";
   code += TypeName(field);
   code += ") *" + TypeName(field) + " " + OffsetPrefix(field);
@@ -235,7 +235,7 @@ static void GetStringField(const StructDef &struct_def,
                            std::string *code_ptr) {
   std::string &code = *code_ptr;
   GenReceiver(struct_def, code_ptr);
-  code += " " +  flatbuffers::MakeCamel(field.name);
+  code += " " +  MakeCamel(field.name);
   code += "() " + TypeName(field) + " ";
   code += OffsetPrefix(field) + "\t\treturn " + GenGetter(field.value.type);
   code += "(o + rcv._tab.Pos)\n\t}\n\treturn nil\n";
@@ -248,7 +248,7 @@ static void GetUnionField(const StructDef &struct_def,
                           std::string *code_ptr) {
   std::string &code = *code_ptr;
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name) + "(";
+  code += " " + MakeCamel(field.name) + "(";
   code += "obj " + TypeName(field) + ") bool ";
   code += OffsetPrefix(field);
   code += "\t\t" + GenGetter(field.value.type);
@@ -262,10 +262,10 @@ static void GetMemberOfVectorOfStruct(const StructDef &struct_def,
                                       const FieldDef &field,
                                       std::string *code_ptr) {
   std::string &code = *code_ptr;
-  AUTO_VAR(vectortype, field.value.type.VectorType());
+  auto vectortype = field.value.type.VectorType();
 
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name);
+  code += " " + MakeCamel(field.name);
   code += "(obj *" + TypeName(field);
   code += ", j int) bool " + OffsetPrefix(field);
   code += "\t\tx := rcv._tab.Vector(o)\n";
@@ -289,10 +289,10 @@ static void GetMemberOfVectorOfNonStruct(const StructDef &struct_def,
                                          const FieldDef &field,
                                          std::string *code_ptr) {
   std::string &code = *code_ptr;
-  AUTO_VAR(vectortype, field.value.type.VectorType());
+  auto vectortype = field.value.type.VectorType();
 
   GenReceiver(struct_def, code_ptr);
-  code += " " + flatbuffers::MakeCamel(field.name);
+  code += " " + MakeCamel(field.name);
   code += "(j int) " + TypeName(field) + " ";
   code += OffsetPrefix(field);
   code += "\t\ta := rcv._tab.Vector(o)\n";
@@ -323,21 +323,21 @@ static void BeginBuilderArgs(const StructDef &struct_def,
 static void StructBuilderArgs(const StructDef &struct_def,
                               const char *nameprefix,
                               std::string *code_ptr) {
-  for (AUTO_VAR(it, struct_def.fields.vec.begin());
+  for (auto it = struct_def.fields.vec.begin();
        it != struct_def.fields.vec.end();
        ++it) {
-    AUTO_VAR(&field, **it);
+    auto &field = **it;
     if (IsStruct(field.value.type)) {
       // Generate arguments for a struct inside a struct. To ensure names
       // don't clash, and to make it obvious these arguments are constructing
-      // a nested struct, prefix the name with the struct name.
+      // a nested struct, prefix the name with the field name.
       StructBuilderArgs(*field.value.type.struct_def,
-                        (field.value.type.struct_def->name + "_").c_str(),
+                        (nameprefix + (field.name + "_")).c_str(),
                         code_ptr);
     } else {
       std::string &code = *code_ptr;
       code += (std::string)", " + nameprefix;
-      code += flatbuffers::MakeCamel(field.name, false);
+      code += MakeCamel(field.name, false);
       code += " " + GenTypeBasic(field.value.type);
     }
   }
@@ -357,19 +357,19 @@ static void StructBuilderBody(const StructDef &struct_def,
   std::string &code = *code_ptr;
   code += "    builder.Prep(" + NumToString(struct_def.minalign) + ", ";
   code += NumToString(struct_def.bytesize) + ")\n";
-  for (AUTO_VAR(it, struct_def.fields.vec.rbegin());
+  for (auto it = struct_def.fields.vec.rbegin();
        it != struct_def.fields.vec.rend();
        ++it) {
-    AUTO_VAR(&field, **it);
+    auto &field = **it;
     if (field.padding)
       code += "    builder.Pad(" + NumToString(field.padding) + ")\n";
     if (IsStruct(field.value.type)) {
       StructBuilderBody(*field.value.type.struct_def,
-                        (field.value.type.struct_def->name + "_").c_str(),
+                        (nameprefix + (field.name + "_")).c_str(),
                         code_ptr);
     } else {
       code += "    builder.Prepend" + GenMethod(field) + "(";
-      code += nameprefix + flatbuffers::MakeCamel(field.name, false) + ")\n";
+      code += nameprefix + MakeCamel(field.name, false) + ")\n";
     }
   }
 }
@@ -397,9 +397,9 @@ static void BuildFieldOfTable(const StructDef &struct_def,
                               const size_t offset,
                               std::string *code_ptr) {
   std::string &code = *code_ptr;
-  code += "func " + struct_def.name + "Add" + flatbuffers::MakeCamel(field.name);
+  code += "func " + struct_def.name + "Add" + MakeCamel(field.name);
   code += "(builder *flatbuffers.Builder, ";
-  code += flatbuffers::MakeCamel(field.name, false) + " ";
+  code += MakeCamel(field.name, false) + " ";
   if (!IsScalar(field.value.type.base_type) && (!struct_def.fixed)) {
     code += "flatbuffers.UOffsetT";
   } else {
@@ -412,9 +412,9 @@ static void BuildFieldOfTable(const StructDef &struct_def,
   if (!IsScalar(field.value.type.base_type) && (!struct_def.fixed)) {
     code += "flatbuffers.UOffsetT";
     code += "(";
-    code += flatbuffers::MakeCamel(field.name, false) + ")";
+    code += MakeCamel(field.name, false) + ")";
   } else {
-    code += flatbuffers::MakeCamel(field.name, false);
+    code += MakeCamel(field.name, false);
   }
   code += ", " + field.value.constant;
   code += ") }\n";
@@ -426,12 +426,12 @@ static void BuildVectorOfTable(const StructDef &struct_def,
                                std::string *code_ptr) {
   std::string &code = *code_ptr;
   code += "func " + struct_def.name + "Start";
-  code += flatbuffers::MakeCamel(field.name);
+  code += MakeCamel(field.name);
   code += "Vector(builder *flatbuffers.Builder, numElems int) ";
   code += "flatbuffers.UOffsetT { return builder.StartVector(";
-  AUTO_VAR(vector_type, field.value.type.VectorType());
-  AUTO_VAR(alignment, InlineAlignment(vector_type));
-  AUTO_VAR(elem_size, InlineSize(vector_type));
+  auto vector_type = field.value.type.VectorType();
+  auto alignment = InlineAlignment(vector_type);
+  auto elem_size = InlineSize(vector_type);
   code += NumToString(elem_size);
   code += ", numElems, " + NumToString(alignment);
   code += ")\n}\n";
@@ -456,7 +456,7 @@ static void GenReceiver(const StructDef &struct_def, std::string *code_ptr) {
 static void GenStructAccessor(const StructDef &struct_def,
                               const FieldDef &field,
                               std::string *code_ptr) {
-  flatbuffers::GenComment(field.doc_comment, code_ptr, nullptr, "");
+  GenComment(field.doc_comment, code_ptr, nullptr, "");
   if (IsScalar(field.value.type.base_type)) {
     if (struct_def.fixed) {
       GetScalarFieldOfStruct(struct_def, field, code_ptr);
@@ -476,7 +476,7 @@ static void GenStructAccessor(const StructDef &struct_def,
         GetStringField(struct_def, field, code_ptr);
         break;
       case BASE_TYPE_VECTOR: {
-        AUTO_VAR(vectortype, field.value.type.VectorType());
+        auto vectortype = field.value.type.VectorType();
         if (vectortype.base_type == BASE_TYPE_STRUCT) {
           GetMemberOfVectorOfStruct(struct_def, field, code_ptr);
         } else {
@@ -504,13 +504,13 @@ static void GenTableBuilders(const StructDef &struct_def,
                              std::string *code_ptr) {
   GetStartOfTable(struct_def, code_ptr);
 
-  for (AUTO_VAR(it, struct_def.fields.vec.begin());
+  for (auto it = struct_def.fields.vec.begin();
        it != struct_def.fields.vec.end();
        ++it) {
-    AUTO_VAR(&field, **it);
+    auto &field = **it;
     if (field.deprecated) continue;
 
-    size_t offset = it - struct_def.fields.vec.begin();
+    auto offset = it - struct_def.fields.vec.begin();
     BuildFieldOfTable(struct_def, field, offset, code_ptr);
     if (field.value.type.base_type == BASE_TYPE_VECTOR) {
       BuildVectorOfTable(struct_def, field, code_ptr);
@@ -526,7 +526,7 @@ static void GenStruct(const StructDef &struct_def,
                       StructDef *root_struct_def) {
   if (struct_def.generated) return;
 
-  flatbuffers::GenComment(struct_def.doc_comment, code_ptr, nullptr);
+  GenComment(struct_def.doc_comment, code_ptr, nullptr);
   BeginClass(struct_def, code_ptr);
   if (&struct_def == root_struct_def) {
     // Generate a special accessor for the table that has been declared as
@@ -536,10 +536,10 @@ static void GenStruct(const StructDef &struct_def,
   // Generate the Init method that sets the field in a pre-existing
   // accessor object. This is to allow object reuse.
   InitializeExisting(struct_def, code_ptr);
-  for (AUTO_VAR(it, struct_def.fields.vec.begin());
+  for (auto it = struct_def.fields.vec.begin();
        it != struct_def.fields.vec.end();
        ++it) {
-    AUTO_VAR(&field, **it);
+    auto &field = **it;
     if (field.deprecated) continue;
 
     GenStructAccessor(struct_def, field, code_ptr);
@@ -558,13 +558,13 @@ static void GenStruct(const StructDef &struct_def,
 static void GenEnum(const EnumDef &enum_def, std::string *code_ptr) {
   if (enum_def.generated) return;
 
-  flatbuffers::GenComment(enum_def.doc_comment, code_ptr, nullptr);
+  GenComment(enum_def.doc_comment, code_ptr, nullptr);
   BeginEnum(code_ptr);
-  for (AUTO_VAR(it, enum_def.vals.vec.begin());
+  for (auto it = enum_def.vals.vec.begin();
        it != enum_def.vals.vec.end();
        ++it) {
-    AUTO_VAR(&ev, **it);
-    flatbuffers::GenComment(ev.doc_comment, code_ptr, nullptr, "\t");
+    auto &ev = **it;
+    GenComment(ev.doc_comment, code_ptr, nullptr, "\t");
     EnumMember(enum_def, ev, code_ptr);
   }
   EndEnum(code_ptr);
@@ -577,15 +577,15 @@ static std::string GenGetter(const Type &type) {
     case BASE_TYPE_UNION: return "rcv._tab.Union";
     case BASE_TYPE_VECTOR: return GenGetter(type.VectorType());
     default:
-      return "rcv._tab.Get" + flatbuffers::MakeCamel(GenTypeGet(type));
+      return "rcv._tab.Get" + MakeCamel(GenTypeGet(type));
   }
 }
 
 // Returns the method name for use with add/put calls.
 static std::string GenMethod(const FieldDef &field) {
   return IsScalar(field.value.type.base_type)
-    ? flatbuffers::MakeCamel(GenTypeBasic(field.value.type))
-    : std::string(IsStruct(field.value.type) ? "Struct" : "UOffsetT");
+    ? MakeCamel(GenTypeBasic(field.value.type))
+    : (IsStruct(field.value.type) ? "Struct" : "UOffsetT");
 }
 
 
@@ -597,15 +597,15 @@ static bool SaveType(const Parser &parser, const Definition &def,
 
   std::string namespace_name;
   std::string namespace_dir = path;  // Either empty or ends in separator.
-  AUTO_VAR(&namespaces, parser.namespaces_.back()->components);
-  for (AUTO_VAR(it, namespaces.begin()); it != namespaces.end(); ++it) {
+  auto &namespaces = parser.namespaces_.back()->components;
+  for (auto it = namespaces.begin(); it != namespaces.end(); ++it) {
     if (namespace_name.length()) {
       namespace_name += ".";
     }
     namespace_name = *it;
     namespace_dir += *it + kPathSeparator;
   }
-  flatbuffers::EnsureDirExists(namespace_dir);
+  EnsureDirExists(namespace_dir);
 
   std::string code = "";
   BeginFile(namespace_name, needs_imports, &code);
@@ -666,7 +666,7 @@ bool GenerateGo(const Parser &parser,
                 const std::string &path,
                 const std::string & /*file_name*/,
                 const GeneratorOptions & /*opts*/) {
-  for (AUTO_VAR(it, parser.enums_.vec.begin());
+  for (auto it = parser.enums_.vec.begin();
        it != parser.enums_.vec.end(); ++it) {
     std::string enumcode;
     go::GenEnum(**it, &enumcode);
@@ -674,10 +674,10 @@ bool GenerateGo(const Parser &parser,
       return false;
   }
 
-  for (AUTO_VAR(it, parser.structs_.vec.begin());
+  for (auto it = parser.structs_.vec.begin();
        it != parser.structs_.vec.end(); ++it) {
     std::string declcode;
-    go::GenStruct(**it, &declcode, parser.root_struct_def);
+    go::GenStruct(**it, &declcode, parser.root_struct_def_);
     if (!go::SaveType(parser, **it, declcode, path, true))
       return false;
   }

@@ -17,21 +17,13 @@
 #include <iostream>
 #include <sstream>
 #include <string>
-
-#include "flatbuffers/flatbuffers.h"
-
-#ifdef __BCPLUSPLUS__
-
-#pragma hdrstop
-
-#endif
-
 #include "flatbuffers/hash.h"
+#include <stdio.h>
 
 enum OutputFormat {
   kDecimal,
   kHexadecimal,
-  kHexadecimal0x,
+  kHexadecimal0x
 };
 
 int main(int argc, char* argv[]) {

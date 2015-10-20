@@ -19,8 +19,13 @@ src/idl_gen_cpp.cpp \
 src/idl_gen_fbs.cpp \
 src/idl_gen_general.cpp \
 src/idl_gen_go.cpp \
+src/idl_gen_js.cpp \
+src/idl_gen_python.cpp \
 src/idl_gen_text.cpp \
-src/idl_parser.cpp
+src/idl_parser.cpp \
+src/reflection.cpp
+
+
 
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
 LOCAL_EXPORT_C_INCLUDES := $(LOCAL_C_INCLUDES)

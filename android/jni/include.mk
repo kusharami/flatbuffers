@@ -66,6 +66,8 @@ FLATBUFFERS_FLATC_PATH?=$(FLATBUFFERS_CMAKELISTS_DIR)
 FLATBUFFERS_FLATC := $(FLATBUFFERS_FLATC_PATH)/Debug/flatc
 endif
 
+FLATBUFFERS_FLATC_ARGS?=
+
 # Search for cmake.
 CMAKE_ROOT := $(realpath $(LOCAL_PATH)/../../../../../../prebuilts/cmake)
 ifeq (,$(CMAKE))
@@ -82,6 +84,14 @@ endif
 endif
 ifeq (,$(CMAKE))
 CMAKE := cmake
+endif
+
+# Windows friendly portable local path.
+# GNU-make doesn't like : in paths, must use relative paths on Windows.
+ifeq (Windows,$(PROJECT_OS))
+PORTABLE_LOCAL_PATH =
+else
+PORTABLE_LOCAL_PATH = $(LOCAL_PATH)/
 endif
 
 # Generate a host build rule for the flatbuffers compiler.
@@ -149,7 +159,7 @@ $(eval \
   $(call flatbuffers_fbs_to_h,$(2),$(3),$(1)): $(1) $(flatc_target)
 	$(call host-echo-build-step,generic,Generate) \
 		$(subst $(LOCAL_PATH)/,,$(call flatbuffers_fbs_to_h,$(2),$(3),$(1)))
-	$(hide) $$(FLATBUFFERS_FLATC) --gen-includes \
+	$(hide) $$(FLATBUFFERS_FLATC) $(FLATBUFFERS_FLATC_ARGS) \
 	  $(foreach include,$(4),-I $(include)) -o $$(dir $$@) -c $$<)
 endef
 
@@ -168,7 +178,7 @@ $(foreach schema,$(1),\
   $(call flatbuffers_header_build_rule,\
 	  $(schema),$(strip $(2)),$(strip $(3)),$(strip $(4))))\
 $(foreach src,$(strip $(5)),\
-  $(eval $(LOCAL_PATH)/$$(src): \
+  $(eval $(PORTABLE_LOCAL_PATH)$$(src): \
 	  $(foreach schema,$(strip $(1)),\
 		  $(call flatbuffers_fbs_to_h,$(strip $(2)),$(strip $(3)),$(schema)))))
 endef

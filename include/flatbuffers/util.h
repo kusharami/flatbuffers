@@ -42,10 +42,8 @@ namespace flatbuffers {
 
 // Convert an integer or floating point value to a string.
 // In contrast to std::stringstream, "char" values are
-// converted to a string of digits.
+// converted to a string of digits, and we don't use scientific notation.
 template<typename T> std::string NumToString(T t) {
-  // to_string() prints different numbers of digits for floats depending on
-  // platform and isn't available on Android, so we use stringstream
   std::stringstream ss;
   ss << t;
   return ss.str();
@@ -56,6 +54,27 @@ template<> inline std::string NumToString<signed char>(signed char t) {
 }
 template<> inline std::string NumToString<unsigned char>(unsigned char t) {
   return NumToString(static_cast<int>(t));
+}
+
+// Special versions for floats/doubles.
+template<> inline std::string NumToString<double>(double t) {
+  // to_string() prints different numbers of digits for floats depending on
+  // platform and isn't available on Android, so we use stringstream
+  std::stringstream ss;
+  // Use std::fixed to surpress scientific notation.
+  ss << std::fixed << t;
+  auto s = ss.str();
+  // Sadly, std::fixed turns "1" into "1.00000", so here we undo that.
+  auto p = s.find_last_not_of('0');
+  if (p != std::string::npos) {
+    s.resize(p + 1);  // Strip trailing zeroes.
+    if (s.back() == '.')
+      s.erase(s.size() - 1, 1);  // Strip '.' if a whole number.
+  }
+  return s;
+}
+template<> inline std::string NumToString<float>(float t) {
+  return NumToString(static_cast<double>(t));
 }
 
 // Convert an integer value to a hexadecimal string.
@@ -71,8 +90,17 @@ inline std::string IntToStringHex(int i, int xdigits) {
   return ss.str();
 }
 
-// Portable implementation of strtoull().
+// Portable implementation of strtoll().
 inline int64_t StringToInt(const char *str, int base = 10) {
+  #ifdef _MSC_VER
+    return _strtoi64(str, nullptr, base);
+  #else
+    return strtoll(str, nullptr, base);
+  #endif
+}
+
+// Portable implementation of strtoull().
+inline int64_t StringToUInt(const char *str, int base = 10) {
   #ifdef _MSC_VER
     return _strtoui64(str, nullptr, base);
   #else
@@ -93,8 +121,18 @@ inline bool FileExists(const char *name) {
 inline bool LoadFile(const char *name, bool binary, std::string *buf) {
   std::ifstream ifs(name, binary ? std::ifstream::binary : std::ifstream::in);
   if (!ifs.is_open()) return false;
-  *buf = std::string(std::istreambuf_iterator<char>(ifs),
-                    std::istreambuf_iterator<char>());
+  if (binary) {
+    // The fastest way to read a file into a string.
+    ifs.seekg(0, std::ios::end);
+    (*buf).resize(static_cast<size_t>(ifs.tellg()));
+    ifs.seekg(0, std::ios::beg);
+    ifs.read(&(*buf)[0], (*buf).size());
+  } else {
+    // This is slower, but works correctly on all platforms for text files.
+    std::ostringstream oss;
+    oss << ifs.rdbuf();
+    *buf = oss.str();
+  }
   return !ifs.bad();
 }
 
@@ -121,24 +159,6 @@ inline bool SaveFile(const char *name, const std::string &buf, bool binary) {
 
 // Functionality for minimalistic portable path handling:
 
-#ifdef __BCPLUSPLUS__
-
-#define kPosixPathSeparator '/'
-
-  #ifdef _Windows
-
-  #define kPathSeparator '\\'
-  #define PathSeparatorSet "\\/"
-
-  #else
-
-  #define kPathSeparator kPosixPathSeparator
-  #define PathSeparatorSet "/"
-
-  #endif
-
-#else
-
 static const char kPosixPathSeparator = '/';
 #ifdef _WIN32
 static const char kPathSeparator = '\\';
@@ -147,8 +167,6 @@ static const char *PathSeparatorSet = "\\/";  // Intentionally no ':'
 static const char kPathSeparator = kPosixPathSeparator;
 static const char *PathSeparatorSet = "/";
 #endif // _WIN32
-
-#endif
 
 // Returns the path with the extension, if any, removed.
 inline std::string StripExtension(const std::string &filepath) {
@@ -165,7 +183,7 @@ inline std::string StripPath(const std::string &filepath) {
 // Strip the last component of the path + separator.
 inline std::string StripFileName(const std::string &filepath) {
   size_t i = filepath.find_last_of(PathSeparatorSet);
-  return i != std::string::npos ? filepath.substr(0, i) : std::string();
+  return i != std::string::npos ? filepath.substr(0, i) : "";
 }
 
 // Concatenates a path with a filename, regardless of wether the path
@@ -173,13 +191,9 @@ inline std::string StripFileName(const std::string &filepath) {
 inline std::string ConCatPathFileName(const std::string &path,
                                       const std::string &filename) {
   std::string filepath = path;
-  if (path.length()) {
-    char last = path[path.length() - 1];
-
-    if (last != kPathSeparator && last != kPosixPathSeparator)
-      filepath += kPathSeparator;
-  }
-
+  if (path.length() && path.back() != kPathSeparator &&
+                       path.back() != kPosixPathSeparator)
+    filepath += kPathSeparator;
   filepath += filename;
   return filepath;
 }
@@ -187,7 +201,7 @@ inline std::string ConCatPathFileName(const std::string &path,
 // This function ensure a directory exists, by recursively
 // creating dirs for any parts of the path that don't exist yet.
 inline void EnsureDirExists(const std::string &filepath) {
-  std::string parent = StripFileName(filepath);
+  auto parent = StripFileName(filepath);
   if (parent.length()) EnsureDirExists(parent);
   #ifdef _WIN32
     _mkdir(filepath.c_str());
@@ -206,7 +220,7 @@ inline std::string AbsolutePath(const std::string &filepath) {
     char abs_path[PATH_MAX];
     return realpath(filepath.c_str(), abs_path)
   #endif
-    ? std::string(abs_path)
+    ? abs_path
     : filepath;
 }
 
