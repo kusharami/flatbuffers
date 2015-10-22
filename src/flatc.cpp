@@ -189,7 +189,7 @@ int main(int argc, const char *argv[]) {
     }
   }
 
-  if (!filenames.size()) Error("missing input files", false, true);
+  if (!filenames.size()) Error("missing input files", true, true);
 
   if (!any_generator)
     Error("no options: specify one of -c -g -j -t -b etc.", true);

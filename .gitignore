@@ -29,7 +29,7 @@ local.properties
 project.properties
 proguard-project.txt
 linklint_results
-Makefile
+./Makefile
 flatc
 flatc.exe
 flathash
@@ -61,3 +61,5 @@ java/target
 **/C++Builder*/*.local
 **/C++Builder*/*.res
 **/C++Builder*/*.stat
+build/VS2013/
+*.stat
