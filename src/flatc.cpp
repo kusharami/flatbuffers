@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#include <limits>
-
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/idl.h"
 #include "flatbuffers/util.h"
@@ -62,6 +60,10 @@ const Generator generators[] = {
     flatbuffers::GeneratorOptions::kJava,
     "Generate Java classes for tables/structs",
     flatbuffers::GeneralMakeRule },
+  { flatbuffers::GenerateJS,       "-s", "JavaScript",
+    flatbuffers::GeneratorOptions::kMAX,
+    "Generate JavaScript code for tables/structs",
+    flatbuffers::JSMakeRule },
   { flatbuffers::GenerateGeneral,  "-n", "C#",
     flatbuffers::GeneratorOptions::kCSharp,
     "Generate C# classes for tables/structs",
@@ -92,12 +94,19 @@ static void Error(const std::string &err, bool usage, bool show_exe_name) {
       "  --defaults-json Output fields whose value is the default when\n"
       "                  writing JSON\n"
       "  --no-prefix     Don\'t prefix enum values with the enum type in C++.\n"
-      "  --gen-includes  Generate include statements for included schemas the\n"
-      "                  generated file depends on (C++).\n"
+      "  --scoped-enums  Use C++11 style scoped and strongly typed enums.\n"
+      "                  also implies --no-prefix.\n"
+      "  --gen-includes  (deprecated), this is the default behavior.\n"
+      "                  If the original behavior is required (no include\n"
+	  "                  statements) use --no-includes.\n"
+      "  --no-includes   Don\'t generate include statements for included\n"
+      "                  schemas the generated file depends on (C++).\n"
       "  --gen-mutable   Generate accessors that can mutate buffers in-place.\n"
+      "  --gen-onefile   Generate single output file for C#\n"
       "  --raw-binary    Allow binaries without file_indentifier to be read.\n"
       "                  This may crash flatc given a mismatched schema.\n"
       "  --proto         Input is a .proto, translate to .fbs.\n"
+      "  --schema        Serialize schemas instead of JSON (use with -b)\n"
       "FILEs may depend on declarations in earlier files.\n"
       "FILEs after the -- must be binary flatbuffer format files.\n"
       "Output files are named using the base file name of the input,\n"
@@ -118,6 +127,7 @@ int main(int argc, const char *argv[]) {
   bool print_make_rules = false;
   bool proto_mode = false;
   bool raw_binary = false;
+  bool schema_binary = false;
   std::vector<std::string> filenames;
   std::vector<const char *> include_directories;
   size_t binary_files_from = std::numeric_limits<size_t>::max();
@@ -134,21 +144,33 @@ int main(int argc, const char *argv[]) {
         include_directories.push_back(argv[argi]);
       } else if(arg == "--strict-json") {
         opts.strict_json = true;
+      } else if(arg == "--no-js-exports") {
+        opts.skip_js_exports = true;
       } else if(arg == "--defaults-json") {
         opts.output_default_scalars_in_json = true;
       } else if(arg == "--no-prefix") {
         opts.prefixed_enums = false;
+      } else if(arg == "--scoped-enums") {
+        opts.prefixed_enums = false;
+        opts.scoped_enums = true;
       } else if(arg == "--gen-mutable") {
         opts.mutable_buffer = true;
       } else if(arg == "--gen-includes") {
-        opts.include_dependence_headers = true;
-      } else if(arg == "--raw-binary") {
+        // Deprecated, remove this option some time in the future.
+        printf("warning: --gen-includes is deprecated (it is now default)\n");
+      } else if(arg == "--no-includes") {
+        opts.include_dependence_headers = false;
+      } else if (arg == "--gen-onefile") {
+        opts.one_file = true;
+      } else if (arg == "--raw-binary") {
         raw_binary = true;
       } else if(arg == "--") {  // Separator between text and binary inputs.
         binary_files_from = filenames.size();
       } else if(arg == "--proto") {
         proto_mode = true;
         any_generator = true;
+      } else if(arg == "--schema") {
+        schema_binary = true;
       } else if(arg == "-M") {
         print_make_rules = true;
       } else {
@@ -174,7 +196,7 @@ int main(int argc, const char *argv[]) {
 
   // Now process the files:
   flatbuffers::Parser parser(opts.strict_json, proto_mode);
-  for (AUTO_VAR(file_it, filenames.begin());
+  for (auto file_it = filenames.begin();
             file_it != filenames.end();
           ++file_it) {
       std::string contents;
@@ -209,12 +231,16 @@ int main(int argc, const char *argv[]) {
           }
         }
       } else {
-        std::string local_include_directory = flatbuffers::StripFileName(*file_it);
+        auto local_include_directory = flatbuffers::StripFileName(*file_it);
         include_directories.push_back(local_include_directory.c_str());
         include_directories.push_back(nullptr);
         if (!parser.Parse(contents.c_str(), &include_directories[0],
                           file_it->c_str()))
           Error(parser.error_, false, false);
+        if (schema_binary) {
+          parser.Serialize();
+          parser.file_extension_ = reflection::SchemaExtension();
+        }
         include_directories.pop_back();
         include_directories.pop_back();
       }
