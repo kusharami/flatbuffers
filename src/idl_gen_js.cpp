@@ -189,7 +189,7 @@ static std::string GenGetter(const Type &type, const std::string &arguments) {
   }
 }
 
-static std::string GenDefaultValue(const Value &value) {
+static std::string GenDefaultValue(const Value &value, const std::string &context) {
   if (value.type.enum_def) {
     if (auto val = value.type.enum_def->ReverseLookup(
         atoi(value.constant.c_str()), false)) {
@@ -205,13 +205,11 @@ static std::string GenDefaultValue(const Value &value) {
       return "null";
 
     case BASE_TYPE_LONG:
-    case BASE_TYPE_ULONG:
-      if (value.constant != "0") {
-        int64_t constant = StringToInt(value.constant.c_str());
-        return "new flatbuffers.Long(" + NumToString((int32_t)constant) +
-          ", " + NumToString((int32_t)(constant >> 32)) + ")";
-      }
-      return "flatbuffers.Long.ZERO";
+    case BASE_TYPE_ULONG: {
+      int64_t constant = StringToInt(value.constant.c_str());
+      return context + ".createLong(" + NumToString((int32_t)constant) +
+        ", " + NumToString((int32_t)(constant >> 32)) + ")";
+    }
 
     default:
       return value.constant;
@@ -417,7 +415,7 @@ static void GenStruct(const Parser &parser, StructDef &struct_def,
           index += ", optionalEncoding";
         }
         code += offset_prefix + GenGetter(field.value.type,
-          "(" + index + ")") + " : " + GenDefaultValue(field.value);
+          "(" + index + ")") + " : " + GenDefaultValue(field.value, "this.bb");
         code += ";\n";
       }
     }
@@ -485,7 +483,7 @@ static void GenStruct(const Parser &parser, StructDef &struct_def,
             code += "false";
           } else if (field.value.type.element == BASE_TYPE_LONG ||
               field.value.type.element == BASE_TYPE_ULONG) {
-            code += "flatbuffers.Long.ZERO";
+            code += "this.bb.createLong(0, 0)";
           } else if (IsScalar(field.value.type.element)) {
             code += "0";
           } else {
@@ -511,12 +509,24 @@ static void GenStruct(const Parser &parser, StructDef &struct_def,
     }
     code += "};\n\n";
 
-    // Emit a length helper
+    // Emit vector helpers
     if (field.value.type.base_type == BASE_TYPE_VECTOR) {
+      // Emit a length helper
       GenDocComment(code_ptr, "@returns {number}");
       code += object_name + ".prototype." + MakeCamel(field.name, false);
       code += "Length = function() {\n" + offset_prefix;
       code += "this.bb.__vector_len(this.bb_pos + offset) : 0;\n};\n\n";
+
+      // For scalar types, emit a typed array helper
+      auto vectorType = field.value.type.VectorType();
+      if (IsScalar(vectorType.base_type)) {
+        GenDocComment(code_ptr, "@returns {" + GenType(vectorType) + "Array}");
+        code += object_name + ".prototype." + MakeCamel(field.name, false);
+        code += "Array = function() {\n" + offset_prefix;
+        code += "new " + GenType(vectorType) + "Array(this.bb.bytes().buffer, "
+          "this.bb.__vector(this.bb_pos + offset), "
+          "this.bb.__vector_len(this.bb_pos + offset)) : null;\n};\n\n";
+      }
     }
   }
 
@@ -570,7 +580,7 @@ static void GenStruct(const Parser &parser, StructDef &struct_def,
         if (field.value.type.base_type == BASE_TYPE_BOOL) {
           code += "+";
         }
-        code += GenDefaultValue(field.value);
+        code += GenDefaultValue(field.value, "builder");
       }
       code += ");\n};\n\n";
 
@@ -653,8 +663,7 @@ static void GenStruct(const Parser &parser, StructDef &struct_def,
 
 // Iterate through all definitions we haven't generate code for (enums, structs,
 // and tables) and output them to a single file.
-std::string GenerateJS(const Parser &parser,
-                       const GeneratorOptions &opts) {
+std::string GenerateJS(const Parser &parser) {
   using namespace js;
 
   // Generate code for all the enum declarations.
@@ -684,7 +693,7 @@ std::string GenerateJS(const Parser &parser,
     code += enum_code;
     code += decl_code;
 
-    if (!exports_code.empty() && !opts.skip_js_exports) {
+    if (!exports_code.empty() && !parser.opts.skip_js_exports) {
       code += "// Exports for Node.js and RequireJS\n";
       code += exports_code;
     }
@@ -702,17 +711,15 @@ static std::string GeneratedFileName(const std::string &path,
 
 bool GenerateJS(const Parser &parser,
                 const std::string &path,
-                const std::string &file_name,
-                const GeneratorOptions &opts) {
-    auto code = GenerateJS(parser, opts);
+                const std::string &file_name) {
+    auto code = GenerateJS(parser);
     return !code.length() ||
            SaveFile(GeneratedFileName(path, file_name).c_str(), code, false);
 }
 
 std::string JSMakeRule(const Parser &parser,
                        const std::string &path,
-                       const std::string &file_name,
-                       const GeneratorOptions & /*opts*/) {
+                       const std::string &file_name) {
   std::string filebase = flatbuffers::StripPath(
       flatbuffers::StripExtension(file_name));
   std::string make_rule = GeneratedFileName(path, filebase) + ": ";
