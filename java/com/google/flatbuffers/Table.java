@@ -19,6 +19,11 @@ package com.google.flatbuffers;
 import static com.google.flatbuffers.Constants.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetDecoder;
+import java.nio.charset.CoderResult;
 
 /// @cond FLATBUFFERS_INTERNAL
 
@@ -26,6 +31,19 @@ import java.nio.ByteOrder;
  * All tables in the generated code derive from this class, and add their own accessors.
  */
 public class Table {
+  private final static ThreadLocal<CharsetDecoder> UTF8_DECODER = new ThreadLocal<CharsetDecoder>() {
+    @Override
+    protected CharsetDecoder initialValue() {
+      return Charset.forName("UTF-8").newDecoder();
+    }
+  };
+  public final static ThreadLocal<Charset> UTF8_CHARSET = new ThreadLocal<Charset>() {
+    @Override
+    protected Charset initialValue() {
+      return Charset.forName("UTF-8");
+    }
+  };
+  private final static ThreadLocal<CharBuffer> CHAR_BUFFER = new ThreadLocal<CharBuffer>();
   /** Used to hold the position of the `bb` buffer. */
   protected int bb_pos;
   /** The underlying ByteBuffer to hold the data of the Table. */
@@ -49,6 +67,11 @@ public class Table {
     return vtable_offset < bb.getShort(vtable) ? bb.getShort(vtable + vtable_offset) : 0;
   }
 
+  protected static int __offset(int vtable_offset, int offset, ByteBuffer bb) {
+    int vtable = bb.array().length - offset;
+    return bb.getShort(vtable + vtable_offset - bb.getInt(vtable)) + vtable;
+  }
+
   /**
    * Retrieve a relative offset.
    *
@@ -56,6 +79,10 @@ public class Table {
    * @return Returns the relative offset stored at `offset`.
    */
   protected int __indirect(int offset) {
+    return offset + bb.getInt(offset);
+  }
+
+  protected static int __indirect(int offset, ByteBuffer bb) {
     return offset + bb.getInt(offset);
   }
 
@@ -71,20 +98,34 @@ public class Table {
    * @return Returns a `String` from the data stored inside the FlatBuffer at `offset`.
    */
   protected String __string(int offset) {
+    CharsetDecoder decoder = UTF8_DECODER.get();
+    decoder.reset();
+
     offset += bb.getInt(offset);
-    if (bb.hasArray()) {
-      return new String(bb.array(), bb.arrayOffset() + offset + SIZEOF_INT, bb.getInt(offset),
-                        FlatBufferBuilder.utf8charset);
-    } else {
-      // We can't access .array(), since the ByteBuffer is read-only,
-      // off-heap or a memory map
-      ByteBuffer bb = this.bb.duplicate().order(ByteOrder.LITTLE_ENDIAN);
-      // We're forced to make an extra copy:
-      byte[] copy = new byte[bb.getInt(offset)];
-      bb.position(offset + SIZEOF_INT);
-      bb.get(copy);
-      return new String(copy, 0, copy.length, FlatBufferBuilder.utf8charset);
+    ByteBuffer src = bb.duplicate().order(ByteOrder.LITTLE_ENDIAN);
+    int length = src.getInt(offset);
+    src.position(offset + SIZEOF_INT);
+    src.limit(offset + SIZEOF_INT + length);
+
+    int required = (int)((float)length * decoder.maxCharsPerByte());
+    CharBuffer dst = CHAR_BUFFER.get();
+    if (dst == null || dst.capacity() < required) {
+      dst = CharBuffer.allocate(required);
+      CHAR_BUFFER.set(dst);
     }
+
+    dst.clear();
+
+    try {
+      CoderResult cr = decoder.decode(src, dst, true);
+      if (!cr.isUnderflow()) {
+        cr.throwException();
+      }
+    } catch (CharacterCodingException x) {
+      throw new Error(x);
+    }
+
+    return dst.flip().toString();
   }
 
   /**
@@ -161,6 +202,76 @@ public class Table {
       if (ident.charAt(i) != (char)bb.get(bb.position() + SIZEOF_INT + i)) return false;
     }
     return true;
+  }
+
+  /**
+   * Sort tables by the key.
+   *
+   * @param offsets An 'int' indexes of the tables into the bb.
+   * @param bb A {@code ByteBuffer} to get the tables.
+   */
+  protected void sortTables(int[] offsets, final ByteBuffer bb) {
+    Integer[] off = new Integer[offsets.length];
+    for (int i = 0; i < offsets.length; i++) off[i] = offsets[i];
+    java.util.Arrays.sort(off, new java.util.Comparator<Integer>() {
+      public int compare(Integer o1, Integer o2) {
+        return keysCompare(o1, o2, bb);
+      }
+    });
+    for (int i = 0; i < offsets.length; i++) offsets[i] = off[i];
+  }
+
+  /**
+   * Compare two tables by the key.
+   *
+   * @param o1 An 'Integer' index of the first key into the bb.
+   * @param o2 An 'Integer' index of the second key into the bb.
+   * @param bb A {@code ByteBuffer} to get the keys.
+   */
+  protected int keysCompare(Integer o1, Integer o2, ByteBuffer bb) { return 0; }
+
+  /**
+   * Compare two strings in the buffer.
+   *
+   * @param offset_1 An 'int' index of the first string into the bb.
+   * @param offset_2 An 'int' index of the second string into the bb.
+   * @param bb A {@code ByteBuffer} to get the strings.
+   */
+  protected static int compareStrings(int offset_1, int offset_2, ByteBuffer bb) {
+    offset_1 += bb.getInt(offset_1);
+    offset_2 += bb.getInt(offset_2);
+    int len_1 = bb.getInt(offset_1);
+    int len_2 = bb.getInt(offset_2);
+    int startPos_1 = offset_1 + SIZEOF_INT;
+    int startPos_2 = offset_2 + SIZEOF_INT;
+    int len = Math.min(len_1, len_2);
+    byte[] bbArray = bb.array();
+    for(int i = 0; i < len; i++) {
+      if (bbArray[i + startPos_1] != bbArray[i + startPos_2])
+        return bbArray[i + startPos_1] - bbArray[i + startPos_2];
+    }
+    return len_1 - len_2;
+  }
+
+  /**
+   * Compare string from the buffer with the 'String' object.
+   *
+   * @param offset_1 An 'int' index of the first string into the bb.
+   * @param key Second string as a byte array.
+   * @param bb A {@code ByteBuffer} to get the first string.
+   */
+  protected static int compareStrings(int offset_1, byte[] key, ByteBuffer bb) {
+    offset_1 += bb.getInt(offset_1);
+    int len_1 = bb.getInt(offset_1);
+    int len_2 = key.length;
+    int startPos_1 = offset_1 + Constants.SIZEOF_INT;
+    int len = Math.min(len_1, len_2);
+    byte[] bbArray = bb.array();
+    for (int i = 0; i < len; i++) {
+      if (bbArray[i + startPos_1] != key[i])
+        return bbArray[i + startPos_1] - key[i];
+    }
+    return len_1 - len_2;
   }
 }
 
